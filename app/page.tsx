@@ -56,13 +56,6 @@ const features = [
  
 ];
 
-const stats = [
-  { value: "99.9%", label: "Uptime" },
-  { value: "50K+", label: "Tasks Created" },
-  { value: "10K+", label: "Active Users" },
-  { value: "4.9/5", label: "User Rating" },
-];
-
 export default function LandingPage() {
   return (
     <div className="min-h-screen bg-background">
@@ -78,9 +71,15 @@ export default function LandingPage() {
             </span>
           </div>
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="sm" asChild>
+            <Button
+              size="sm"
+              asChild
+              className="bg-transparent text-foreground transition-colors hover:bg-primary hover:text-black"
+            >
               <Link href="/login">Sign In</Link>
             </Button>
+
+
             <Button size="sm" asChild>
               <Link href="/signup">
                 Get Started
@@ -106,8 +105,7 @@ export default function LandingPage() {
               
             </h1>
             <p className="mt-6 text-lg text-muted-foreground max-w-2xl mx-auto text-pretty leading-relaxed">
-              Vyntic is a simple yet powerful task management tool designed to help you
-stay focused, organized, and in control of your daily tasks and projects.
+              Vyntic is a simple yet powerful task management tool designed to help you stay focused, organized, and in control of your daily tasks and projects.
             </p>
             <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
               <Button size="lg" className="h-12 px-8 text-base" asChild>
@@ -118,12 +116,12 @@ stay focused, organized, and in control of your daily tasks and projects.
               </Button>
               <Button
                 size="lg"
-                variant="outline"
-                className="h-12 px-8 text-base bg-transparent"
+                className="h-12 px-8 text-base bg-transparent text-foreground transition-colors hover:bg-primary hover:text-black"
                 asChild
               >
                 <Link href="/login">Sign In to Your Account</Link>
               </Button>
+
             </div>
           </div>
         </div>

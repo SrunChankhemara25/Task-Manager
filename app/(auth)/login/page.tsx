@@ -28,7 +28,7 @@ function LoginForm() {
 
     if (success) {
     // Go to verify page and pass email in query string
-      router.push(`/verify?email=${encodeURIComponent(email)}`);
+      router.push(`/verify-signin?email=${encodeURIComponent(email)}`);
     }else {
       setError("Invalid email or password, or your account has been blocked.");
     }
