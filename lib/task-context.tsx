@@ -285,7 +285,7 @@ export function TaskProvider({ children }: { children: ReactNode }) {
       {
         id: "user-1",
         full_name: "Khemara",
-        email: "khemra@gmail.com",
+        email: "khemara@gmail.com",
         password: "khemara123",
         role: "user" as const,
         status: "active" as const,

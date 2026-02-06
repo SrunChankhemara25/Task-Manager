@@ -22,11 +22,11 @@ import { Button } from "@/components/ui/button";
 import { useState } from "react";
 
 const userNavItems = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/dashboard/tasks", label: "Tasks", icon: CheckSquare },
-  { href: "/dashboard/categories", label: "Categories", icon: FolderKanban },
-  { href: "/dashboard/notifications", label: "Notifications", icon: Bell },
-  { href: "/dashboard/settings", label: "Settings", icon: Settings },
+  { href: "/user", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/user/tasks", label: "Tasks", icon: CheckSquare },
+  { href: "/user/categories", label: "Categories", icon: FolderKanban },
+  { href: "/user/notifications", label: "Notifications", icon: Bell },
+  { href: "/user/settings", label: "Settings", icon: Settings },
 ];
 
 const adminNavItems = [
@@ -46,10 +46,10 @@ export function AppSidebar() {
   const isAdmin = user?.role === "admin";
   const navItems = isAdmin ? adminNavItems : userNavItems;
 
-  // const handleLogout = () => {
-  //   logout();
-  //   window.location.href = "/login";
-  // };
+  const handleLogout = () => {
+    logout();
+    window.location.href = "/login";
+  };
 
   return (
     <>
@@ -82,11 +82,11 @@ export function AppSidebar() {
           {/* Logo */}
           <div className="flex items-center gap-3 px-6 py-6 border-b border-sidebar-border">
             <div className="flex items-center justify-center w-10 h-10">
-              <Link href="/"><img src="/logo.png" alt="logo" /></Link>
+              <img src="/logo.png" alt="logo" />
             </div>
             <div className="flex-1">
               <span className="text-lg font-semibold text-sidebar-foreground">
-                Vynric
+                Vyntic
               </span>
               {isAdmin && (
                 <span className="ml-2 px-2 py-0.5 text-xs font-medium bg-sidebar-primary/20 text-sidebar-primary rounded-full">
@@ -104,7 +104,7 @@ export function AppSidebar() {
             {navItems.map((item) => {
               const isActive =
                 pathname === item.href ||
-                (item.href !== "/dashboard" &&
+                (item.href !== "/user" &&
                   item.href !== "/admin" &&
                   pathname.startsWith(item.href));
 
@@ -132,8 +132,7 @@ export function AppSidebar() {
               );
             })}
           </nav>
-          <div className="px-4 py-4 border-t border-sidebar-border space-y-3">
-
+          <div className="px-4 py-4 border-t border-sidebar-border space-y-3">         
             {/* User Info Card */}
             <div className="p-4 rounded-xl bg-sidebar-accent/50 border border-sidebar-border">
               <div className="flex items-center gap-3">
@@ -152,7 +151,7 @@ export function AppSidebar() {
             </div>
 
             <button
-              // onClick={handleLogout}
+              onClick={handleLogout}
               className="flex items-center gap-3 w-full px-4 py-3 rounded-xl text-sm font-medium text-sidebar-foreground/70 hover:bg-destructive/10 hover:text-destructive transition-all duration-200"
             >
               <LogOut className="h-5 w-5" />

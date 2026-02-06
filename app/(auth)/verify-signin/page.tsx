@@ -58,7 +58,7 @@ export default function VerifySignIn() {
             if (user.role === "admin") {
                 router.push("/admin");
             } else {
-                router.push("/dashboard");
+                router.push("/user");
             }
         }
     }, 2000);

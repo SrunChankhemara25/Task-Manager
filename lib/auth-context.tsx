@@ -28,7 +28,7 @@ const DEMO_USERS: User[] = [
   {
     id: "admin-1",
     full_name: "Admin User",
-    email: "admin@taskmanager.com",
+    email: "admin@gmail.com",
     password: "admin123",
     role: "admin",
     status: "active",
@@ -36,9 +36,9 @@ const DEMO_USERS: User[] = [
   },
   {
     id: "user-1",
-    full_name: "John Doe",
-    email: "john@example.com",
-    password: "user123",
+    full_name: "Khemara",
+    email: "khemara@gmail.com",
+    password: "khemara123",
     role: "user",
     status: "active",
     created_at: new Date().toISOString(),
