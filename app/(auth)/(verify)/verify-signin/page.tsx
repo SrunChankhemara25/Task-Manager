@@ -56,9 +56,9 @@ export default function VerifySignIn() {
             if (storedUser) {
                 const user = JSON.parse(storedUser);
             if (user.role === "admin") {
-                router.push("/admin");
+                router.push("/admin/dashboard");
             } else {
-                router.push("/user");
+                router.push("/user/dashboard");
             }
         }
     }, 2000);

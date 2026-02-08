@@ -22,7 +22,7 @@ import { Button } from "@/components/ui/button";
 import { useState } from "react";
 
 const userNavItems = [
-  { href: "/user", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/user/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/user/tasks", label: "Tasks", icon: CheckSquare },
   { href: "/user/categories", label: "Categories", icon: FolderKanban },
   { href: "/user/notifications", label: "Notifications", icon: Bell },
@@ -30,7 +30,7 @@ const userNavItems = [
 ];
 
 const adminNavItems = [
-  { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/users", label: "Users", icon: Users },
   { href: "/admin/tasks", label: "All Tasks", icon: CheckSquare },
   { href: "/admin/notifications", label: "Notifications", icon: Bell },

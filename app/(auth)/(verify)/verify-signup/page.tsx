@@ -52,7 +52,7 @@ export default function VerifySignUp() {
     setTimeout(() => {
       setIsLoading(false);
       // Navigate to user account page after successful sign-up verification
-      router.push("/account"); // replace with your actual account page
+      router.push("/user/dashboard"); // replace with your actual account page
     }, 2000);
   };
 
