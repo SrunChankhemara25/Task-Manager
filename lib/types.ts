@@ -11,6 +11,7 @@ export interface User {
   password: string;
   role: UserRole;
   status: UserStatus;
+  email_verified?: boolean;
   created_at: string;
 }
 
