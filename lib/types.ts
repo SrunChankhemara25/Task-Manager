@@ -1,4 +1,3 @@
-// lib/types.ts
 export type TaskStatus = "pending" | "in_progress" | "done";
 export type TaskPriority = "low" | "medium" | "high";
 
