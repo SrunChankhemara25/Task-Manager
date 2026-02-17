@@ -1,7 +1,8 @@
+// components/task-card.tsx
 "use client";
 
 import { useState } from "react";
-import { format, isPast, isToday } from "date-fns";
+import { format, isPast, isToday, isValid } from "date-fns";
 import {
   Calendar,
   MoreVertical,
@@ -9,7 +10,6 @@ import {
   Trash2,
   CheckCircle2,
   Clock,
-  AlertCircle,
   Circle,
 } from "lucide-react";
 import type { Task, Category, TaskStatus } from "@/lib/types";
@@ -49,6 +49,7 @@ const priorityConfig = {
   },
 };
 
+// ✅ FIXED: Status config keys MUST match your TaskStatus type: "pending", "in_progress", "done"
 const statusConfig = {
   pending: {
     icon: Circle,
@@ -56,7 +57,7 @@ const statusConfig = {
     bgColor: "bg-muted hover:bg-muted/80",
     label: "Pending",
   },
-  doing: {
+  in_progress: {  // ✅ Changed from "doing" to "in_progress"
     icon: Clock,
     color: "text-chart-3",
     bgColor: "bg-chart-3/20 hover:bg-chart-3/30",
@@ -79,11 +80,15 @@ export function TaskCard({
 }: TaskCardProps) {
   const [isHovered, setIsHovered] = useState(false);
 
-  const dueDate = new Date(task.due_date);
-  const isOverdue = isPast(dueDate) && task.status !== "done";
-  const isDueToday = isToday(dueDate);
+  // ✅ Validate date before creating Date object
+  const dueDate = task.due_date ? new Date(task.due_date) : new Date();
+  const isValidDate = isValid(dueDate);
+  const isOverdue = isValidDate && isPast(dueDate) && task.status !== "done";
+  const isDueToday = isValidDate && isToday(dueDate);
 
-  const StatusIcon = statusConfig[task.status].icon;
+  // ✅ Safely get status config (fallback to pending if invalid)
+  const currentStatus = statusConfig[task.status] || statusConfig.pending;
+  const StatusIcon = currentStatus.icon;
 
   return (
     <div
@@ -103,24 +108,25 @@ export function TaskCard({
       />
 
       <div className="flex items-start gap-4 pl-3">
-        {/* Status button */}
+        {/* Status button - Click to cycle through statuses */}
         <button
           onClick={() => {
+            // ✅ FIXED: Use "in_progress" to match your TaskStatus type
             const nextStatus: TaskStatus =
               task.status === "pending"
-                ? "doing"
-                : task.status === "doing"
+                ? "in_progress"
+                : task.status === "in_progress"
                   ? "done"
                   : "pending";
             onStatusChange(task.id, nextStatus);
           }}
           className={cn(
             "flex items-center justify-center w-8 h-8 rounded-xl transition-all duration-200 shrink-0 mt-0.5",
-            statusConfig[task.status].bgColor
+            currentStatus.bgColor
           )}
         >
           <StatusIcon
-            className={cn("h-4 w-4", statusConfig[task.status].color)}
+            className={cn("h-4 w-4", currentStatus.color)}
           />
         </button>
 
@@ -144,7 +150,7 @@ export function TaskCard({
               )}
             </div>
 
-            {/* Actions */}
+            {/* Actions Dropdown */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -173,7 +179,8 @@ export function TaskCard({
                   Mark as Pending
                 </DropdownMenuItem>
                 <DropdownMenuItem
-                  onClick={() => onStatusChange(task.id, "doing")}
+                  // ✅ FIXED: Use "in_progress" to match your TaskStatus type
+                  onClick={() => onStatusChange(task.id, "in_progress")}
                 >
                   <Clock className="h-4 w-4 mr-2" />
                   Mark as In Progress
@@ -196,7 +203,7 @@ export function TaskCard({
             </DropdownMenu>
           </div>
 
-          {/* Meta info */}
+          {/* Meta info - Priority, Category, Due Date */}
           <div className="flex flex-wrap items-center gap-2 mt-3">
             <span
               className={cn(
@@ -230,11 +237,13 @@ export function TaskCard({
               )}
             >
               <Calendar className="h-3 w-3" />
-              {isOverdue
-                ? "Overdue"
-                : isDueToday
-                  ? "Due today"
-                  : format(dueDate, "MMM d")}
+              {isValidDate
+                ? isOverdue
+                  ? "Overdue"
+                  : isDueToday
+                    ? "Due today"
+                    : format(dueDate, "MMM d")
+                : "No due date"}
             </span>
           </div>
         </div>

@@ -1,25 +1,6 @@
-export type UserRole = "admin" | "user";
-export type UserStatus = "active" | "blocked";
-export type TaskStatus = "pending" | "doing" | "done";
+// lib/types.ts
+export type TaskStatus = "pending" | "in_progress" | "done";
 export type TaskPriority = "low" | "medium" | "high";
-export type NotificationStatus = "unread" | "read";
-
-export interface User {
-  id: string;
-  full_name: string;
-  email: string;
-  password: string;
-  role: UserRole;
-  status: UserStatus;
-  email_verified?: boolean;
-  created_at: string;
-}
-
-export interface Category {
-  id: string;
-  name: string;
-  user_id: string;
-}
 
 export interface Task {
   id: string;
@@ -30,14 +11,30 @@ export interface Task {
   priority: TaskPriority;
   user_id: string;
   category_id: string | null;
-  created_at: string;
+  created_at?: string;
+}
+
+export interface Category {
+  id: string;
+  name: string;
+  user_id?: string;
 }
 
 export interface Notification {
   id: string;
   message: string;
   send_date: string;
-  status: NotificationStatus;
+  status: "read" | "unread";
   user_id: string;
   task_id: string | null;
+}
+
+export interface User {
+  id: string;
+  full_name: string;
+  email: string;
+  password?: string;
+  role: "admin" | "user";
+  status: "active" | "blocked";
+  created_at?: string;
 }

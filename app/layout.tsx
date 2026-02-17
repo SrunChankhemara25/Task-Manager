@@ -1,7 +1,9 @@
-import React from "react"
+// app/layout.tsx
+import React from "react";
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
+import { ToastProvider } from "@/lib/toast-context"; // ✅ Import ToastProvider
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -38,8 +40,11 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${inter.className} antialiased`}>
-        {children}
-        <Analytics />
+        {/* ✅ Wrap everything with ToastProvider */}
+        <ToastProvider>
+          {children}
+          <Analytics />
+        </ToastProvider>
       </body>
     </html>
   );

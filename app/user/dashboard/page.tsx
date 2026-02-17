@@ -1,3 +1,4 @@
+// app/user/dashboard/page.tsx
 "use client";
 
 import { useState } from "react";
@@ -30,7 +31,7 @@ export default function DashboardPage() {
   // Calculate stats
   const totalTasks = tasks.length;
   const pendingTasks = tasks.filter((t) => t.status === "pending").length;
-  const inProgressTasks = tasks.filter((t) => t.status === "doing").length;
+  const inProgressTasks = tasks.filter((t) => t.status === "in_progress").length;
   const completedTasks = tasks.filter((t) => t.status === "done").length;
 
   // Get recent tasks (not completed)
@@ -137,10 +138,13 @@ export default function DashboardPage() {
 
           <div className="space-y-3">
             {recentTasks.length > 0 ? (
-              recentTasks.map((task) => (
+              recentTasks.map((task, index) => (
                 <TaskCard
-                  key={task.id}
-                  task={task}
+                  key={task.id || `task-${index}`}  // ✅ FIXED: Fallback key if id is missing
+                  task={{
+                    ...task,
+                    id: task.id || `task-${index}`,  // ✅ Ensure task has valid id
+                  }}
                   category={getCategoryForTask(task)}
                   onEdit={handleEditTask}
                   onDelete={deleteTask}
@@ -261,6 +265,8 @@ export default function DashboardPage() {
         categories={categories}
         onSave={handleSaveTask}
       />
+      
     </div>
+    
   );
 }

@@ -135,3 +135,36 @@
     color: var(--foreground);
   }
 }
+/* app/globals.css */
+
+/* Toast slide-in animation */
+@keyframes slide-in-from-right-full {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.animate-in {
+  animation: slide-in-from-right-full 0.3s ease-out;
+}
+
+/* Optional: Fade-out animation for dismissal */
+@keyframes fade-out {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+}
+
+.animate-out {
+  animation: fade-out 0.2s ease-in;
+}

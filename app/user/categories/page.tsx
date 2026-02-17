@@ -1,3 +1,4 @@
+// app/user/categories/page.tsx
 "use client";
 
 import { useState } from "react";
@@ -117,7 +118,7 @@ export default function CategoriesPage() {
             const taskCount = getTaskCount(category.id);
             return (
               <div
-                key={category.id}
+                key={category.id}  // ✅ Unique key from database ID
                 className="group p-5 rounded-2xl bg-card border border-border hover:border-primary/30 transition-all duration-300"
               >
                 <div className="flex items-start justify-between">

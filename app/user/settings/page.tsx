@@ -1,9 +1,11 @@
+// app/user/settings/page.tsx
 "use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { User, Mail, Lock, Save, Loader2 } from "lucide-react";
+import { User, Mail, Lock, Save, Loader2, Trash2 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
+import { useToast } from "@/lib/toast-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,131 +25,150 @@ import {
 
 export default function SettingsPage() {
   const { user, logout } = useAuth();
+  const { showToast } = useToast();
   const router = useRouter();
+  
   const [fullName, setFullName] = useState(user?.full_name || "");
   const [email, setEmail] = useState(user?.email || "");
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isSaving, setIsSaving] = useState(false);
-  const [message, setMessage] = useState<{
-    type: "success" | "error";
-    text: string;
-  } | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const handleSaveProfile = async () => {
-    setIsSaving(true);
-    setMessage(null);
-
-    // Simulate save
-    await new Promise((resolve) => setTimeout(resolve, 500));
-
-    // Update user in localStorage
-    if (user) {
-      const updatedUser = { ...user, full_name: fullName, email };
-      localStorage.setItem("task_manager_user", JSON.stringify(updatedUser));
-
-      // Also update in users list if exists
-      const storedUsers = localStorage.getItem("task_manager_users");
-      if (storedUsers) {
-        const users = JSON.parse(storedUsers);
-        const updatedUsers = users.map((u: typeof user) =>
-          u.id === user.id ? updatedUser : u
-        );
-        localStorage.setItem("task_manager_users", JSON.stringify(updatedUsers));
-      }
-    }
-
-    setMessage({ type: "success", text: "Profile updated successfully!" });
-    setIsSaving(false);
-  };
-
-  const handleChangePassword = async () => {
-    setMessage(null);
-
-    if (newPassword !== confirmPassword) {
-      setMessage({ type: "error", text: "New passwords do not match" });
+    if (!user) {
+      showToast("Please log in to update profile", "error");
       return;
     }
 
-    if (newPassword.length < 6) {
-      setMessage({
-        type: "error",
-        text: "Password must be at least 6 characters",
+    setIsSaving(true);
+
+    try {
+      const res = await fetch(`/api/users/${user.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          full_name: fullName,
+          email: email,
+        }),
       });
-      return;
-    }
 
-    if (user && currentPassword !== user.password) {
-      setMessage({ type: "error", text: "Current password is incorrect" });
-      return;
-    }
-
-    setIsSaving(true);
-
-    // Simulate save
-    await new Promise((resolve) => setTimeout(resolve, 500));
-
-    // Update password in localStorage
-    if (user) {
-      const updatedUser = { ...user, password: newPassword };
-      localStorage.setItem("task_manager_user", JSON.stringify(updatedUser));
-
-      const storedUsers = localStorage.getItem("task_manager_users");
-      if (storedUsers) {
-        const users = JSON.parse(storedUsers);
-        const updatedUsers = users.map((u: typeof user) =>
-          u.id === user.id ? updatedUser : u
-        );
-        localStorage.setItem("task_manager_users", JSON.stringify(updatedUsers));
+      if (res.ok) {
+        const updatedUser = await res.json();
+        // Update user in auth context (localStorage)
+        localStorage.setItem("task_manager_user", JSON.stringify(updatedUser));
+        showToast("Profile updated successfully!", "success");
+        
+        // Refresh page to show updated name
+        setTimeout(() => {
+          window.location.reload();
+        }, 1000);
+      } else {
+        const error = await res.json();
+        showToast(error.error || "Failed to update profile", "error");
       }
+    } catch (error) {
+      console.error("Error updating profile:", error);
+      showToast("Network error. Please try again.", "error");
+    } finally {
+      setIsSaving(false);
     }
-
-    setMessage({ type: "success", text: "Password changed successfully!" });
-    setCurrentPassword("");
-    setNewPassword("");
-    setConfirmPassword("");
-    setIsSaving(false);
   };
 
-  const handleDeleteAccount = () => {
-    // Remove user from storage
-    const storedUsers = localStorage.getItem("task_manager_users");
-    if (storedUsers && user) {
-      const users = JSON.parse(storedUsers);
-      const filteredUsers = users.filter(
-        (u: typeof user) => u.id !== user.id
-      );
-      localStorage.setItem(
-        "task_manager_users",
-        JSON.stringify(filteredUsers)
-      );
+  // app/user/settings/page.tsx (handleChangePassword function)
+const handleChangePassword = async () => {
+  if (!user) {
+    showToast("Please log in to change password", "error");
+    return;
+  }
+
+  if (newPassword !== confirmPassword) {
+    showToast("New passwords do not match", "error");
+    return;
+  }
+
+  if (newPassword.length < 6) {
+    showToast("Password must be at least 6 characters", "error");
+    return;
+  }
+
+  setIsSaving(true);
+
+  try {
+    // First verify current password
+    const loginRes = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: user.email,
+        password: currentPassword,
+      }),
+    });
+
+    if (!loginRes.ok) {
+      showToast("Current password is incorrect", "error");
+      setIsSaving(false);
+      return;
     }
 
-    // Remove user's tasks and categories
-    const storedTasks = localStorage.getItem("task_manager_tasks");
-    if (storedTasks && user) {
-      const tasks = JSON.parse(storedTasks);
-      const filteredTasks = tasks.filter(
-        (t: { user_id: string }) => t.user_id !== user.id
-      );
-      localStorage.setItem("task_manager_tasks", JSON.stringify(filteredTasks));
+    // Hash new password
+    const bcrypt = await import("bcryptjs");
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Update password in database
+    const res = await fetch(`/api/users/${user.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        password: hashedPassword,
+      }),
+    });
+
+    if (res.ok) {
+      showToast("Password changed successfully!", "success");
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    } else {
+      const error = await res.json();
+      showToast(error.error || "Failed to change password", "error");
+    }
+  } catch (error) {
+    console.error("Error changing password:", error);
+    showToast("Network error. Please try again.", "error");
+  } finally {
+    setIsSaving(false);
+  }
+};
+
+  const handleDeleteAccount = async () => {
+    if (!user) {
+      showToast("Please log in to delete account", "error");
+      return;
     }
 
-    const storedCategories = localStorage.getItem("task_manager_categories");
-    if (storedCategories && user) {
-      const categories = JSON.parse(storedCategories);
-      const filteredCategories = categories.filter(
-        (c: { user_id: string }) => c.user_id !== user.id
-      );
-      localStorage.setItem(
-        "task_manager_categories",
-        JSON.stringify(filteredCategories)
-      );
-    }
+    setIsDeleting(true);
 
-    logout();
-    router.push("/login");
+    try {
+      const res = await fetch(`/api/users/${user.id}`, {
+        method: "DELETE",
+      });
+
+      if (res.ok) {
+        showToast("Account deleted successfully", "success");
+        logout();
+        router.push("/auth/login");
+      } else {
+        const error = await res.json();
+        showToast(error.error || "Failed to delete account", "error");
+      }
+    } catch (error) {
+      console.error("Error deleting account:", error);
+      showToast("Network error. Please try again.", "error");
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   return (
@@ -160,18 +181,27 @@ export default function SettingsPage() {
         </p>
       </div>
 
-      {/* Message */}
-      {message && (
-        <div
-          className={`p-4 rounded-lg ${
-            message.type === "success"
-              ? "bg-success/10 text-success"
-              : "bg-destructive/10 text-destructive"
-          }`}
-        >
-          {message.text}
-        </div>
-      )}
+      {/* User Info Card */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center justify-center w-16 h-16 rounded-xl bg-primary/10 text-primary font-semibold text-2xl">
+              {user?.full_name?.charAt(0).toUpperCase() || "U"}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-lg font-semibold text-foreground truncate">
+                {user?.full_name}
+              </p>
+              <p className="text-sm text-muted-foreground truncate">
+                {user?.email}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1 capitalize">
+                {user?.role} Account
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Profile Settings */}
       <Card>
@@ -179,22 +209,6 @@ export default function SettingsPage() {
           <CardTitle className="text-lg">Profile Information</CardTitle>
           <CardDescription>Update your personal details</CardDescription>
         </CardHeader>
-        {/* User Info Card */}
-            <div className="pl-4 border-b border-border pb-8 mb-4">
-              <div className="flex items-center gap-3">
-                <div className="flex items-center justify-center w-13 h-13 rounded-xl bg-sidebar-primary text-sidebar-primary-foreground font-semibold text-lg">
-                  {user?.full_name?.charAt(0).toUpperCase() || "U"}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xl font-medium text-sidebar-foreground truncate">
-                    {user?.full_name}
-                  </p>
-                  <p className="text-l text-sidebar-foreground/60 truncate">
-                    {user?.email}
-                  </p>
-                </div>
-              </div>
-            </div>
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="fullName">Full Name</Label>
@@ -204,7 +218,7 @@ export default function SettingsPage() {
                 id="fullName"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                className="pl-10"
+                className="pl-10 h-12 rounded-xl"
               />
             </div>
           </div>
@@ -218,12 +232,14 @@ export default function SettingsPage() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="pl-10"
+                className="pl-10 h-12 rounded-xl"
               />
             </div>
           </div>
 
-          <Button onClick={handleSaveProfile} disabled={isSaving}>
+          <Separator />
+
+          <Button onClick={handleSaveProfile} disabled={isSaving} className="h-12">
             {isSaving ? (
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
             ) : (
@@ -250,7 +266,7 @@ export default function SettingsPage() {
                 type="password"
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
-                className="pl-10"
+                className="pl-10 h-12 rounded-xl"
               />
             </div>
           </div>
@@ -264,7 +280,7 @@ export default function SettingsPage() {
                 type="password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                className="pl-10"
+                className="pl-10 h-12 rounded-xl"
               />
             </div>
           </div>
@@ -278,14 +294,17 @@ export default function SettingsPage() {
                 type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="pl-10"
+                className="pl-10 h-12 rounded-xl"
               />
             </div>
           </div>
 
+          <Separator />
+
           <Button
             onClick={handleChangePassword}
             disabled={isSaving || !currentPassword || !newPassword}
+            className="h-12"
           >
             {isSaving ? (
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -298,37 +317,60 @@ export default function SettingsPage() {
       </Card>
 
       {/* Danger Zone */}
-      <Card className="border-destructive/50">
+      <Card className="border-destructive/50 bg-destructive/5">
         <CardHeader>
-          <CardTitle className="text-lg text-destructive">Danger Zone</CardTitle>
+          <CardTitle className="text-lg text-destructive flex items-center gap-2">
+            <Trash2 className="h-5 w-5" />
+            Danger Zone
+          </CardTitle>
           <CardDescription>
             Irreversible actions for your account
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button variant="destructive">Delete Account</Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  This action cannot be undone. This will permanently delete your
-                  account and remove all your data including tasks and categories.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={handleDeleteAccount}
-                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                >
+          <div className="space-y-4">
+            <div className="text-sm text-muted-foreground">
+              Once you delete your account, there is no going back. Please be certain.
+            </div>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" disabled={isDeleting} className="h-12">
+                  {isDeleting ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-4 w-4 mr-2" />
+                  )}
                   Delete Account
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle className="text-destructive">
+                    Are you absolutely sure?
+                  </AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This action cannot be undone. This will permanently delete your
+                    account and remove all your data including:
+                    <ul className="list-disc list-inside mt-2 space-y-1">
+                      <li>All tasks</li>
+                      <li>All categories</li>
+                      <li>All notifications</li>
+                      <li>Your profile information</li>
+                    </ul>
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleDeleteAccount}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    Delete Account
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
         </CardContent>
       </Card>
     </div>

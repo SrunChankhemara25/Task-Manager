@@ -1,108 +1,73 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { drizzle } from 'drizzle-orm/neon-http';
-import { users, verificationCodes } from '@/db/schema';
-import { eq } from 'drizzle-orm';
-import bcrypt from 'bcryptjs';
-
-// Helper function to generate 6-digit code
-function generateVerificationCode(): string {
-  return Math.floor(100000 + Math.random() * 900000).toString();
-}
+// app/api/auth/register/route.ts
+import { NextRequest, NextResponse } from "next/server";
+import { db } from "@/db";
+import { users } from "@/db/schema";
+import { eq } from "drizzle-orm";
+import bcrypt from "bcryptjs"; // ✅ Add bcrypt
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, password, fullName } = await request.json();
+    console.log("📡 POST /api/auth/register");
+    
+    const body = await request.json();
+    const { email, password, full_name } = body;
 
-    // Validation
-    if (!email || !password || !fullName) {
+    if (!email || !password || !full_name) {
       return NextResponse.json(
-        { error: 'Missing required fields' },
+        { error: "Email, password, and full name required" },
         { status: 400 }
       );
     }
 
-    if (password.length < 6) {
-      return NextResponse.json(
-        { error: 'Password must be at least 6 characters' },
-        { status: 400 }
-      );
-    }
-
-    const db = drizzle(process.env.DATABASE_URL!);
-
-    // Check if user already exists
-    const existingUser = await db
+    // Check if user exists
+    const existing = await db
       .select()
       .from(users)
-      .where(eq(users.email, email))
+      .where(eq(users.email, email.toLowerCase()))
       .limit(1);
 
-    if (existingUser.length > 0) {
+    if (existing.length > 0) {
       return NextResponse.json(
-        { error: 'Email already registered' },
-        { status: 400 }
+        { error: "Email already registered" },
+        { status: 409 }
       );
     }
 
-    // Hash password
+    // ✅ Hash password before storing
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Generate user ID
-    const userId = `user-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-
-    // Create new user (email_verified defaults to false)
+    // Create user
     const newUser = await db
       .insert(users)
       .values({
-        id: userId,
-        email,
-        password: hashedPassword,
-        full_name: fullName,
-        role: 'user',
-        status: 'active',
-        email_verified: false, // Require email verification
+        fullName: full_name,
+        email: email.toLowerCase(),
+        password: hashedPassword, // ✅ Store hashed password
+        role: "User",
+        status: "Active",
       })
       .returning();
 
-    const user = newUser[0];
+    console.log("✅ User registered:", newUser[0].email);
 
-    // Generate verification code
-    const code = generateVerificationCode();
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes from now
-    const verificationId = `verify-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-
-    // Store verification code
-    await db.insert(verificationCodes).values({
-      id: verificationId,
-      email,
-      code,
-      type: 'signup',
-      is_used: false,
-      expires_at: expiresAt,
-    });
-
-    // In a real app, you would send this code via email
-    console.log(`[DEV] Signup verification code for ${email}: ${code}`);
-
-    // Return user data and verification code
     return NextResponse.json(
       {
-        id: user.id,
-        email: user.email,
-        full_name: user.full_name,
-        role: user.role,
-        status: user.status,
-        email_verified: user.email_verified,
-        created_at: user.created_at,
-        message: 'User created. Verification code sent to email.',
-        verificationCode: code, // Include in dev, remove in production
+        user: {
+          id: newUser[0].userId,
+          full_name: newUser[0].fullName,
+          email: newUser[0].email,
+          role: "user" as const,
+          status: "active" as const,
+          created_at: newUser[0].createdAt?.toISOString(),
+        },
+        message: "Registration successful",
       },
       { status: 201 }
     );
   } catch (error) {
-    console.error('Register error:', error);
+    console.error("❌ Register error:", error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: "Server error", details: String(error) },
       { status: 500 }
     );
   }

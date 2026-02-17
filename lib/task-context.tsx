@@ -1,3 +1,4 @@
+// lib/task-context.tsx
 "use client";
 
 import {
@@ -9,15 +10,15 @@ import {
 } from "react";
 import type { Task, Category, Notification, User } from "./types";
 import { useAuth } from "./auth-context";
+import { useToast } from "./toast-context";
 
 interface TaskContextType {
   tasks: Task[];
   categories: Category[];
   notifications: Notification[];
   users: User[];
-  addTask: (
-    task: Omit<Task, "id" | "created_at" | "user_id">
-  ) => void;
+  isLoading: boolean;
+  addTask: (task: Omit<Task, "id" | "created_at" | "user_id">) => void;
   updateTask: (id: string, updates: Partial<Task>) => void;
   deleteTask: (id: string) => void;
   addCategory: (name: string) => void;
@@ -25,7 +26,9 @@ interface TaskContextType {
   deleteCategory: (id: string) => void;
   markNotificationRead: (id: string) => void;
   markAllNotificationsRead: () => void;
-  // Admin functions
+  refreshTasks: () => void;
+  refreshCategories: () => void;
+  refreshNotifications: () => void;
   getAllTasks: () => Task[];
   getAllUsers: () => User[];
   updateUserStatus: (userId: string, status: "active" | "blocked") => void;
@@ -34,312 +37,371 @@ interface TaskContextType {
 
 const TaskContext = createContext<TaskContextType | undefined>(undefined);
 
-// Sample demo data
-const DEMO_CATEGORIES: Category[] = [
-  { id: "cat-1", name: "Work", user_id: "user-1" },
-  { id: "cat-2", name: "Personal", user_id: "user-1" },
-  { id: "cat-3", name: "Shopping", user_id: "user-1" },
-];
+// Helper: Safe JSON parse
+const safeJsonParse = async (res: Response) => {
+  const contentType = res.headers.get("content-type");
+  if (contentType && contentType.includes("application/json")) {
+    try {
+      return await res.json();
+    } catch {
+      return null;
+    }
+  }
+  return null;
+};
 
-const DEMO_TASKS: Task[] = [
-  {
-    id: "task-1",
-    title: "Complete project proposal",
-    description: "Finish the Q1 project proposal document",
-    due_date: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(),
-    status: "doing",
-    priority: "high",
-    user_id: "user-1",
-    category_id: "cat-1",
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: "task-2",
-    title: "Review team submissions",
-    description: "Review and provide feedback on team submissions",
-    due_date: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
-    status: "pending",
-    priority: "medium",
-    user_id: "user-1",
-    category_id: "cat-1",
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: "task-3",
-    title: "Buy groceries",
-    description: "Get vegetables, fruits, and dairy products",
-    due_date: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000).toISOString(),
-    status: "pending",
-    priority: "low",
-    user_id: "user-1",
-    category_id: "cat-3",
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: "task-4",
-    title: "Exercise routine",
-    description: "30 minutes of cardio and stretching",
-    due_date: new Date().toISOString(),
-    status: "done",
-    priority: "medium",
-    user_id: "user-1",
-    category_id: "cat-2",
-    created_at: new Date().toISOString(),
-  },
-];
+// Helper: Format task
+const formatTask = (task: any): Task => ({
+  id: task.id || task.taskId,
+  title: task.title,
+  description: task.description || "",
+  due_date: task.due_date || task.dueDate || new Date().toISOString(),
+  status: task.status || "pending",
+  priority: task.priority || "medium",
+  user_id: task.user_id || task.userId,
+  category_id: task.category_id || task.categoryId,
+  created_at: task.created_at || task.createdAt,
+});
 
-const DEMO_NOTIFICATIONS: Notification[] = [
-  {
-    id: "notif-1",
-    message: "Task 'Complete project proposal' is due in 2 days",
-    send_date: new Date().toISOString(),
-    status: "unread",
-    user_id: "user-1",
-    task_id: "task-1",
-  },
-  {
-    id: "notif-2",
-    message: "Welcome to Task Manager! Start by creating your first task.",
-    send_date: new Date().toISOString(),
-    status: "unread",
-    user_id: "user-1",
-    task_id: null,
-  },
-];
+// Helper: Format category
+const formatCategory = (cat: any): Category => ({
+  id: cat.id || cat.categoryId,
+  name: cat.name || cat.categoryName,
+  user_id: cat.user_id || cat.userId,
+});
+
+// Helper: Format notification
+const formatNotification = (notif: any): Notification => ({
+  id: notif.id || notif.notificationId,
+  message: notif.message,
+  send_date: notif.send_date || notif.sendDate || new Date().toISOString(),
+  status: notif.status || "unread",
+  user_id: notif.user_id || notif.userId,
+  task_id: notif.task_id || notif.taskId,
+});
 
 export function TaskProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
+  const { showToast } = useToast();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [users, setUsers] = useState<User[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Load data from localStorage on mount
+  // Fetch Tasks
+  const fetchTasks = async () => {
+    if (!user?.id) {
+      setTasks([]);
+      return;
+    }
+    try {
+      const res = await fetch(`/api/tasks?userId=${user.id}`);
+      if (res.ok) {
+        const data = await safeJsonParse(res);
+        if (data) {
+          setTasks(data.map(formatTask));
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching tasks:", error);
+      setTasks([]);
+    }
+  };
+
+  // Fetch Categories
+  const fetchCategories = async () => {
+    try {
+      const res = await fetch("/api/categories");
+      if (res.ok) {
+        const data = await safeJsonParse(res);
+        if (data) {
+          setCategories(data.map(formatCategory));
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching categories:", error);
+      setCategories([]);
+    }
+  };
+
+  // Fetch Notifications
+  const fetchNotifications = async () => {
+    if (!user?.id) {
+      setNotifications([]);
+      return;
+    }
+    try {
+      const res = await fetch(`/api/notifications?userId=${user.id}`);
+      if (res.ok) {
+        const data = await safeJsonParse(res);
+        if (data) {
+          setNotifications(data.map(formatNotification));
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching notifications:", error);
+      setNotifications([]);
+    }
+  };
+
+  // Load data on user login
   useEffect(() => {
-    const storedTasks = localStorage.getItem("task_manager_tasks");
-    const storedCategories = localStorage.getItem("task_manager_categories");
-    const storedNotifications = localStorage.getItem("task_manager_notifications");
-    const storedUsers = localStorage.getItem("task_manager_users");
-
-    if (storedTasks) {
-      setTasks(JSON.parse(storedTasks));
-    } else {
-      setTasks(DEMO_TASKS);
-      localStorage.setItem("task_manager_tasks", JSON.stringify(DEMO_TASKS));
-    }
-
-    if (storedCategories) {
-      setCategories(JSON.parse(storedCategories));
-    } else {
-      setCategories(DEMO_CATEGORIES);
-      localStorage.setItem(
-        "task_manager_categories",
-        JSON.stringify(DEMO_CATEGORIES)
-      );
-    }
-
-    if (storedNotifications) {
-      setNotifications(JSON.parse(storedNotifications));
-    } else {
-      setNotifications(DEMO_NOTIFICATIONS);
-      localStorage.setItem(
-        "task_manager_notifications",
-        JSON.stringify(DEMO_NOTIFICATIONS)
-      );
-    }
-
-    if (storedUsers) {
-      setUsers(JSON.parse(storedUsers));
-    }
-  }, []);
-
-  // Filter tasks and categories for current user
-  const userTasks = user
-    ? tasks.filter((t) => t.user_id === user.id)
-    : [];
-  const userCategories = user
-    ? categories.filter((c) => c.user_id === user.id)
-    : [];
-  const userNotifications = user
-    ? notifications.filter((n) => n.user_id === user.id)
-    : [];
-
-  const addTask = (taskData: Omit<Task, "id" | "created_at" | "user_id">) => {
-    if (!user) return;
-
-    const newTask: Task = {
-      ...taskData,
-      id: `task-${Date.now()}`,
-      user_id: user.id,
-      created_at: new Date().toISOString(),
+    const loadData = async () => {
+      setIsLoading(true);
+      await Promise.all([fetchTasks(), fetchCategories(), fetchNotifications()]);
+      setIsLoading(false);
     };
 
-    const updatedTasks = [...tasks, newTask];
-    setTasks(updatedTasks);
-    localStorage.setItem("task_manager_tasks", JSON.stringify(updatedTasks));
+    if (user) {
+      loadData();
+    } else {
+      setTasks([]);
+      setCategories([]);
+      setNotifications([]);
+      setIsLoading(false);
+    }
+  }, [user]);
 
-    // Add notification for new task
-    const newNotification: Notification = {
-      id: `notif-${Date.now()}`,
-      message: `New task "${newTask.title}" has been created`,
-      send_date: new Date().toISOString(),
-      status: "unread",
-      user_id: user.id,
-      task_id: newTask.id,
-    };
-    const updatedNotifications = [...notifications, newNotification];
-    setNotifications(updatedNotifications);
-    localStorage.setItem(
-      "task_manager_notifications",
-      JSON.stringify(updatedNotifications)
-    );
+  // ADD Task
+  const addTask = async (taskData: Omit<Task, "id" | "created_at" | "user_id">) => {
+    if (!user) {
+      showToast("Please log in to create tasks", "error");
+      return;
+    }
+    try {
+      const res = await fetch("/api/tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...taskData, user_id: user.id }),
+      });
+
+      if (res.ok) {
+        const newTask = await safeJsonParse(res);
+        if (newTask) {
+          setTasks((prev) => [...prev, formatTask(newTask)]);
+          await fetchNotifications();
+          showToast(`Task "${newTask.title}" created successfully!`, "success");
+        }
+      } else {
+        const error = await safeJsonParse(res);
+        showToast(error?.error || "Failed to create task", "error");
+      }
+    } catch (error) {
+      console.error("Error adding task:", error);
+      showToast("Network error. Please try again.", "error");
+    }
   };
 
-  const updateTask = (id: string, updates: Partial<Task>) => {
-    const updatedTasks = tasks.map((t) =>
-      t.id === id ? { ...t, ...updates } : t
-    );
-    setTasks(updatedTasks);
-    localStorage.setItem("task_manager_tasks", JSON.stringify(updatedTasks));
+  // UPDATE Task
+  const updateTask = async (id: string, updates: Partial<Task>) => {
+    try {
+      const res = await fetch(`/api/tasks/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updates),
+      });
+
+      if (res.ok) {
+        const updatedTask = await safeJsonParse(res);
+        if (updatedTask) {
+          setTasks((prev) =>
+            prev.map((t) => (t.id === id ? formatTask(updatedTask) : t))
+          );
+          showToast("Task updated successfully!", "success");
+        }
+      } else {
+        const error = await safeJsonParse(res);
+        showToast(error?.error || "Failed to update task", "error");
+      }
+    } catch (error) {
+      console.error("Error updating task:", error);
+      showToast("Network error. Please try again.", "error");
+    }
   };
 
-  const deleteTask = (id: string) => {
-    const updatedTasks = tasks.filter((t) => t.id !== id);
-    setTasks(updatedTasks);
-    localStorage.setItem("task_manager_tasks", JSON.stringify(updatedTasks));
+  // DELETE Task
+  const deleteTask = async (id: string) => {
+    try {
+      const res = await fetch(`/api/tasks/${id}`, {
+        method: "DELETE",
+      });
+
+      if (res.ok) {
+        setTasks((prev) => prev.filter((t) => t.id !== id));
+        showToast("Task deleted successfully!", "success");
+      } else {
+        const error = await safeJsonParse(res);
+        showToast(error?.error || "Failed to delete task", "error");
+      }
+    } catch (error) {
+      console.error("Error deleting task:", error);
+      showToast("Network error. Please try again.", "error");
+    }
   };
 
-  const addCategory = (name: string) => {
+  // ADD Category
+  const addCategory = async (name: string) => {
+    if (!user) {
+      showToast("Please log in to create categories", "error");
+      return;
+    }
+    try {
+      const res = await fetch("/api/categories", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ category_name: name, user_id: user.id }),
+      });
+
+      if (res.ok) {
+        const newCat = await safeJsonParse(res);
+        if (newCat) {
+          setCategories((prev) => [...prev, formatCategory(newCat)]);
+          showToast(`Category "${name}" created successfully!`, "success");
+        }
+      } else {
+        const error = await safeJsonParse(res);
+        showToast(error?.error || "Failed to create category", "error");
+      }
+    } catch (error) {
+      console.error("Error adding category:", error);
+      showToast("Network error. Please try again.", "error");
+    }
+  };
+
+  // UPDATE Category
+  const updateCategory = async (id: string, name: string) => {
+    try {
+      const res = await fetch(`/api/categories/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ category_name: name }),
+      });
+
+      if (res.ok) {
+        const updatedCat = await safeJsonParse(res);
+        if (updatedCat) {
+          setCategories((prev) =>
+            prev.map((c) => (c.id === id ? formatCategory(updatedCat) : c))
+          );
+          showToast(`Category updated to "${name}"!`, "success");
+        }
+      } else {
+        const error = await safeJsonParse(res);
+        showToast(error?.error || "Failed to update category", "error");
+      }
+    } catch (error) {
+      console.error("Error updating category:", error);
+      showToast("Network error. Please try again.", "error");
+    }
+  };
+
+  // DELETE Category
+  const deleteCategory = async (id: string) => {
+    try {
+      const res = await fetch(`/api/categories/${id}`, {
+        method: "DELETE",
+      });
+
+      if (res.ok) {
+        setCategories((prev) => prev.filter((c) => c.id !== id));
+        setTasks((prev) =>
+          prev.map((t) => (t.category_id === id ? { ...t, category_id: null } : t))
+        );
+        showToast("Category deleted successfully!", "success");
+      } else {
+        const error = await safeJsonParse(res);
+        showToast(error?.error || "Failed to delete category", "error");
+      }
+    } catch (error) {
+      console.error("Error deleting category:", error);
+      showToast("Network error. Please try again.", "error");
+    }
+  };
+
+  // Mark Notification Read
+  const markNotificationRead = async (id: string) => {
+    try {
+      const res = await fetch(`/api/notifications/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "read" }),
+      });
+
+      if (res.ok) {
+        setNotifications((prev) =>
+          prev.map((n) => (n.id === id ? { ...n, status: "read" } : n))
+        );
+      }
+    } catch (error) {
+      console.error("Error marking notification:", error);
+    }
+  };
+
+  // Mark All Notifications Read
+  const markAllNotificationsRead = async () => {
     if (!user) return;
+    try {
+      const unreadIds = notifications
+        .filter((n) => n.user_id === user.id && n.status === "unread")
+        .map((n) => n.id);
 
-    const newCategory: Category = {
-      id: `cat-${Date.now()}`,
-      name,
-      user_id: user.id,
-    };
-
-    const updatedCategories = [...categories, newCategory];
-    setCategories(updatedCategories);
-    localStorage.setItem(
-      "task_manager_categories",
-      JSON.stringify(updatedCategories)
-    );
+      await Promise.all(unreadIds.map((id) => markNotificationRead(id)));
+    } catch (error) {
+      console.error("Error marking all notifications:", error);
+    }
   };
 
-  const updateCategory = (id: string, name: string) => {
-    const updatedCategories = categories.map((c) =>
-      c.id === id ? { ...c, name } : c
-    );
-    setCategories(updatedCategories);
-    localStorage.setItem(
-      "task_manager_categories",
-      JSON.stringify(updatedCategories)
-    );
-  };
+  // Refresh Functions
+  const refreshTasks = fetchTasks;
+  const refreshCategories = fetchCategories;
+  const refreshNotifications = fetchNotifications;
 
-  const deleteCategory = (id: string) => {
-    const updatedCategories = categories.filter((c) => c.id !== id);
-    setCategories(updatedCategories);
-    localStorage.setItem(
-      "task_manager_categories",
-      JSON.stringify(updatedCategories)
-    );
-
-    // Remove category from tasks
-    const updatedTasks = tasks.map((t) =>
-      t.category_id === id ? { ...t, category_id: null } : t
-    );
-    setTasks(updatedTasks);
-    localStorage.setItem("task_manager_tasks", JSON.stringify(updatedTasks));
-  };
-
-  const markNotificationRead = (id: string) => {
-    const updatedNotifications = notifications.map((n) =>
-      n.id === id ? { ...n, status: "read" as const } : n
-    );
-    setNotifications(updatedNotifications);
-    localStorage.setItem(
-      "task_manager_notifications",
-      JSON.stringify(updatedNotifications)
-    );
-  };
-
-  const markAllNotificationsRead = () => {
-    if (!user) return;
-    const updatedNotifications = notifications.map((n) =>
-      n.user_id === user.id ? { ...n, status: "read" as const } : n
-    );
-    setNotifications(updatedNotifications);
-    localStorage.setItem(
-      "task_manager_notifications",
-      JSON.stringify(updatedNotifications)
-    );
-  };
-
-  // Admin functions
+  // Admin Functions
   const getAllTasks = () => tasks;
-  const getAllUsers = () => {
-    const storedUsers = localStorage.getItem("task_manager_users");
-    const registeredUsers = storedUsers ? JSON.parse(storedUsers) : [];
-    return [
-      {
-        id: "user-1",
-        full_name: "Khemara",
-        email: "khemara@gmail.com",
-        password: "khemara123",
-        role: "user" as const,
-        status: "active" as const,
-        created_at: new Date().toISOString(),
-      },
-      ...registeredUsers,
-    ];
-  };
+  const getAllUsers = () => users;
 
-  const updateUserStatus = (
-    userId: string,
-    status: "active" | "blocked"
-  ) => {
-    const storedUsers = localStorage.getItem("task_manager_users");
-    if (storedUsers) {
-      const parsedUsers = JSON.parse(storedUsers);
-      const updatedUsers = parsedUsers.map((u: User) =>
-        u.id === userId ? { ...u, status } : u
-      );
-      localStorage.setItem(
-        "task_manager_users",
-        JSON.stringify(updatedUsers)
-      );
-      setUsers(updatedUsers);
+  const updateUserStatus = async (userId: string, status: "active" | "blocked") => {
+    try {
+      const res = await fetch(`/api/admin/users/${userId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      });
+
+      if (res.ok) {
+        setUsers((prev) =>
+          prev.map((u) => (u.id === userId ? { ...u, status } : u))
+        );
+      }
+    } catch (error) {
+      console.error("Error updating user:", error);
     }
   };
 
-  const deleteUser = (userId: string) => {
-    const storedUsers = localStorage.getItem("task_manager_users");
-    if (storedUsers) {
-      const parsedUsers = JSON.parse(storedUsers);
-      const updatedUsers = parsedUsers.filter(
-        (u: User) => u.id !== userId
-      );
-      localStorage.setItem(
-        "task_manager_users",
-        JSON.stringify(updatedUsers)
-      );
-      setUsers(updatedUsers);
-    }
+  const deleteUser = async (userId: string) => {
+    try {
+      const res = await fetch(`/api/admin/users/${userId}`, {
+        method: "DELETE",
+      });
 
-    // Also delete user's tasks
-    const updatedTasks = tasks.filter((t) => t.user_id !== userId);
-    setTasks(updatedTasks);
-    localStorage.setItem("task_manager_tasks", JSON.stringify(updatedTasks));
+      if (res.ok) {
+        setUsers((prev) => prev.filter((u) => u.id !== userId));
+        setTasks((prev) => prev.filter((t) => t.user_id !== userId));
+      }
+    } catch (error) {
+      console.error("Error deleting user:", error);
+    }
   };
 
   return (
     <TaskContext.Provider
       value={{
-        tasks: userTasks,
-        categories: userCategories,
-        notifications: userNotifications,
+        tasks,
+        categories,
+        notifications,
         users,
+        isLoading,
         addTask,
         updateTask,
         deleteTask,
@@ -348,6 +410,9 @@ export function TaskProvider({ children }: { children: ReactNode }) {
         deleteCategory,
         markNotificationRead,
         markAllNotificationsRead,
+        refreshTasks,
+        refreshCategories,
+        refreshNotifications,
         getAllTasks,
         getAllUsers,
         updateUserStatus,
