@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import bcrypt from "bcryptjs"; // ✅ Add bcrypt
+import bcrypt from "bcryptjs"; 
 
 export async function POST(request: NextRequest) {
   try {
@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
 
     const userData = user[0];
 
-    // ✅ Compare hashed password
+
     const isValidPassword = await bcrypt.compare(password, userData.password);
     
     if (!isValidPassword) {
@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log("✅ Login successful:", userData.email);
+    console.log("Login successful:", userData.email);
 
     return NextResponse.json({
       user: {
@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
       message: "Login successful",
     });
   } catch (error) {
-    console.error("❌ Login error:", error);
+    console.error("Login error:", error);
     return NextResponse.json(
       { error: "Server error", details: String(error) },
       { status: 500 }

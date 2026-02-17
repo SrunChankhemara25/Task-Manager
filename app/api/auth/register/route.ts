@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import bcrypt from "bcryptjs"; // ✅ Add bcrypt
+import bcrypt from "bcryptjs";
 
 export async function POST(request: NextRequest) {
   try {
@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // ✅ Hash password before storing
+    // Hash password before storing
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // Create user
@@ -42,13 +42,13 @@ export async function POST(request: NextRequest) {
       .values({
         fullName: full_name,
         email: email.toLowerCase(),
-        password: hashedPassword, // ✅ Store hashed password
+        password: hashedPassword,
         role: "User",
         status: "Active",
       })
       .returning();
 
-    console.log("✅ User registered:", newUser[0].email);
+    console.log("User registered:", newUser[0].email);
 
     return NextResponse.json(
       {
@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     );
   } catch (error) {
-    console.error("❌ Register error:", error);
+    console.error("Register error:", error);
     return NextResponse.json(
       { error: "Server error", details: String(error) },
       { status: 500 }

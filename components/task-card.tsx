@@ -80,13 +80,11 @@ export function TaskCard({
 }: TaskCardProps) {
   const [isHovered, setIsHovered] = useState(false);
 
-  // ✅ Validate date before creating Date object
   const dueDate = task.due_date ? new Date(task.due_date) : new Date();
   const isValidDate = isValid(dueDate);
   const isOverdue = isValidDate && isPast(dueDate) && task.status !== "done";
   const isDueToday = isValidDate && isToday(dueDate);
 
-  // ✅ Safely get status config (fallback to pending if invalid)
   const currentStatus = statusConfig[task.status] || statusConfig.pending;
   const StatusIcon = currentStatus.icon;
 
@@ -111,7 +109,6 @@ export function TaskCard({
         {/* Status button - Click to cycle through statuses */}
         <button
           onClick={() => {
-            // ✅ FIXED: Use "in_progress" to match your TaskStatus type
             const nextStatus: TaskStatus =
               task.status === "pending"
                 ? "in_progress"
@@ -179,7 +176,6 @@ export function TaskCard({
                   Mark as Pending
                 </DropdownMenuItem>
                 <DropdownMenuItem
-                  // ✅ FIXED: Use "in_progress" to match your TaskStatus type
                   onClick={() => onStatusChange(task.id, "in_progress")}
                 >
                   <Clock className="h-4 w-4 mr-2" />

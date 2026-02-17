@@ -122,7 +122,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     router.push("/auth/login");
   };
 
-  // ✅ Update User Profile (for Settings page)
   const updateUser = async (userData: Partial<User>): Promise<boolean> => {
     if (!user) {
       showToast("Please log in to update profile", "error");
@@ -270,7 +269,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         register,
         logout,
         isLoading,
-        updateUser, // ✅ Added for Settings page
+        updateUser, 
         forgotPassword,
         verifyCode,
         resetPassword,

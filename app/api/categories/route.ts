@@ -1,4 +1,4 @@
-// app/api/categories/route.ts
+
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { categories } from "@/db/schema";
@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
   try {
     const allCategories = await db.select().from(categories);
 
-    // ✅ Map database fields to frontend expected fields
+
     const formatted = allCategories.map((cat) => ({
       id: cat.categoryId,
       name: cat.categoryName,
@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
       created_at: newCategory[0].createdAt?.toISOString(),
     };
 
-    console.log("✅ Category created:", formatted.id);
+    console.log("Category created:", formatted.id);
     return NextResponse.json(formatted, { status: 201 });
   } catch (error) {
     console.error("Error creating category:", error);

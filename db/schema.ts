@@ -1,8 +1,6 @@
-// db/schema.ts
 import { pgTable, uuid, varchar, text, timestamp, pgEnum } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
-// ✅ FIXED: Use underscore instead of space
 export const taskStatusEnum = pgEnum("task_status", ["pending", "in_progress", "done"]);
 export const priorityEnum = pgEnum("priority", ["low", "medium", "high"]);
 export const userRoleEnum = pgEnum("user_role", ["Admin", "User"]);
@@ -19,7 +17,6 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
 });
 
-// Categories Table ✅ Correct for CRUD
 export const categories = pgTable("categories", {
   categoryId: uuid("category_id").primaryKey().defaultRandom(),
   categoryName: varchar("category_name", { length: 255 }).notNull(),

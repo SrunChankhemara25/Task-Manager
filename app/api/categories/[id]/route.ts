@@ -43,7 +43,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       created_at: updated[0].createdAt?.toISOString(),
     };
 
-    console.log("✅ Category updated:", formatted.id);
+    console.log("Category updated:", formatted.id);
     return NextResponse.json(formatted);
   } catch (error) {
     console.error("Error updating category:", error);
@@ -59,7 +59,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
     const { id } = await params;
 
-    // ✅ First, unset category_id from all tasks in this category
+
     await db
       .update(tasks)
       .set({ categoryId: null })
@@ -78,7 +78,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    console.log("✅ Category deleted:", id);
+    console.log("Category deleted:", id);
     return NextResponse.json({ message: "Category deleted successfully", id });
   } catch (error) {
     console.error("Error deleting category:", error);
